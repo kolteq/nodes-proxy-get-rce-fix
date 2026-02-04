@@ -1,0 +1,30 @@
+# Istio-system namespace for global service map configuration
+configNamespace: istio-system
+
+# ALL Kubelet IPs (Cluster Nodes)
+# kubectl get nodes -o wide
+kubeletIps:
+  - 10.142.0.4
+  - 10.142.0.5
+  - 10.142.0.6
+
+# Enforce the fix in the namespaces on workloads with the label. You can use multiple Namespaces and Labels!
+# Istio needs to be enabled in the Namespaces!
+enforcements:
+  - namespace: first-ns
+    workloads:
+      - name: block-nginx
+        labels:
+          app: nginx
+      - name: block-datadog
+        labels:
+          app: datadog
+
+  - namespace: second-ns
+    workloads:
+      - name: block-nginx
+        labels:
+          app: nginx
+      - name: block-datadog
+        labels:
+          app: datadog

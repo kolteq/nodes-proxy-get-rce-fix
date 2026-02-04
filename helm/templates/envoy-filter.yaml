@@ -1,0 +1,95 @@
+{{- range $nsConfig := .Values.enforcements }}
+  {{- $targetNamespace := $nsConfig.namespace }}
+  {{- range $workload := $nsConfig.workloads }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: {{ $workload.name }}
+  namespace: {{ $targetNamespace }}
+spec:
+  workloadSelector:
+    labels:
+{{ toYaml $workload.labels | indent 6 }}
+  configPatches:
+  # 1. TLS Inspector (Detect HTTPS)
+  - applyTo: LISTENER
+    match:
+      context: SIDECAR_OUTBOUND
+      listener:
+        portNumber: 10250
+    patch:
+      operation: MERGE
+      value:
+        listener_filters:
+        - name: envoy.filters.listener.tls_inspector
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+
+  # 2. TLS Termination (Decrypt using Sidecar Identity)
+  - applyTo: FILTER_CHAIN
+    match:
+      context: SIDECAR_OUTBOUND
+      listener:
+        portNumber: 10250
+    patch:
+      operation: MERGE
+      value:
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+            common_tls_context:
+              tls_certificate_sds_secret_configs:
+              - name: "default"
+                sds_config:
+                  resource_api_version: V3
+                  api_config_source:
+                    api_type: GRPC
+                    transport_api_version: V3
+                    grpc_services:
+                    - envoy_grpc:
+                        cluster_name: sds-grpc
+
+  # 3. HTTP Manager + Lua Script (The Block Logic)
+  - applyTo: NETWORK_FILTER
+    match:
+      context: SIDECAR_OUTBOUND
+      listener:
+        portNumber: 10250
+        filterChain:
+          filter:
+            name: "envoy.filters.network.tcp_proxy"
+    patch:
+      operation: REPLACE
+      value:
+        name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: "kubelet_mitm_{{ $workload.name }}"
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: kubelet_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: "outbound|10250||kubelet.internal"
+          http_filters:
+          - name: envoy.filters.http.lua
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+              inlineCode: |
+                function envoy_on_request(handle)
+                  local upgrade = handle:headers():get("upgrade")
+                  if upgrade ~= nil and string.lower(upgrade) == "websocket" then
+                    handle:respond({[":status"]="403"}, "KolTEQ Nodes Proxy Get RCE Fix\n")
+                  end
+                end
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  {{- end }}
+{{- end }}

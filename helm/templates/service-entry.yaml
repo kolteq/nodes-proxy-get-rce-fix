@@ -1,0 +1,22 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: kubelet-cluster-ips
+  namespace: {{ .Values.configNamespace }}
+spec:
+  hosts:
+  - kubelet.internal
+  location: MESH_EXTERNAL
+  resolution: STATIC
+  ports:
+  - number: 10250
+    name: https-kubelet
+    protocol: HTTPS
+  addresses:
+  {{- range .Values.kubeletIps }}
+  - {{ . }}/32
+  {{- end }}
+  endpoints:
+  {{- range .Values.kubeletIps }}
+  - address: {{ . }}
+  {{- end }}
