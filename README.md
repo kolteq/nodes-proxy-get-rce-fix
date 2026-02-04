@@ -1,6 +1,8 @@
 # Nodes/Proxy GET RCE Fix
 Mitigates the [Kubernetes Nodes/Proxy GET RCE](https://grahamhelton.com/blog/nodes-proxy-rce) by enforcing an Istio sidecar outbound filter that blocks WebSocket upgrades to the kubelet (port 10250).
 
+![demo](./demo.gif)
+
 ## What this chart deploys
 - `ServiceEntry` + `DestinationRule` in the Istio config namespace for a static `kubelet.internal` service mapping to node IPs.
 - `EnvoyFilter` objects in target namespaces that:
