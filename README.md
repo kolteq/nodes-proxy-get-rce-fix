@@ -16,20 +16,11 @@ Mitigates the [Kubernetes Nodes/Proxy GET RCE](https://grahamhelton.com/blog/nod
 - Sidecar injection enabled for the workloads you want to protect.
 - Node (kubelet) internal IPs available (`kubectl get nodes -o wide`).
 
-## Adding the Helm chart repo
-Add the chart repository and install:
-
-```bash
-helm repo add kolteq https://charts.kolteq.com
-helm repo update
-helm search repo kolteq
-```
-
 ## Configuration
 Review defaults:
 
 ```bash
-helm show values kolteq/nodes-proxy-get-rce-fix
+helm show values oci://registry.kolteq.com/nodes-proxy-get-rce-fix/nodes-proxy-get-rce-fix --version 0.1.0
 ```
 
 Minimal values example:
@@ -51,3 +42,11 @@ Key values:
 - `configNamespace`: Namespace for Istio config (`ServiceEntry`, `DestinationRule`), typically `istio-system`.
 - `kubeletIps`: List of kubelet node IPs (one entry per node).
 - `enforcements`: List of namespaces and workload selectors to apply the `EnvoyFilter` to.
+
+## Install
+
+Install the Helm chart.
+
+```bash
+helm install kolteq-nodes-proxy-get-rce-fix oci://registry.kolteq.com/nodes-proxy-get-rce-fix/nodes-proxy-get-rce-fix --version 0.1.0 -f values.yaml
+```
